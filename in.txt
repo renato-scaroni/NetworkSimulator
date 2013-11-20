@@ -18,3 +18,11 @@ $simulator attach-agent $httpc0 $h0
 $simulator attach-agent $httpc1 $h1
 $simulator attach-agent $https2 $h2
 $simulator attach-agent $dns3 $h3
+
+#links
+
+$simulator duplex-link $h0 $r0.0 10Mbps 10ms
+$simulator duplex-link $h1 $r0.1 5Mbps 2ms
+$simulator duplex-link $r0.2 $r1.0 2Mbps 20ms
+$simulator duplex-link $r1.1 $h2 10Mbps 5ms
+$simulator duplex-link $r1.2 $h3 5Mbps 2ms

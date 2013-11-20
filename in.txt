@@ -1,0 +1,20 @@
+# Criac ̃o de 4 computadores
+set h0 [$simulator host]
+set h1 [$simulator host]
+set h2 [$simulator host]
+set h3 [$simulator host]
+# Criac ̃o de 2 roteadores com 3 interfaces cada
+set r0 [$simulator router 3]
+set r1 [$simulator router 3]
+# Configurac ̧ ̃ao dos agentes da camada de aplicac ̧ ̃ao. h0 e h1 v ̃ao rodar
+# clientes HTTP. h2 vai ser um servidor HTTP e h3 vai ser o servidor DNS
+# Obs.: n ̃ao h ́ a necessidade de explicitar um cliente DNS. Todos os
+# hosts j ́a tem um cliente DNS embutido
+set httpc0 [new Agent/HTTPClient]
+set httpc1 [new Agent/HTTPClient]
+set https2 [new Agent/HTTPServer]
+set dns3 [new Agent/DNSServer]
+$simulator attach-agent $httpc0 $h0
+$simulator attach-agent $httpc1 $h1
+$simulator attach-agent $https2 $h2
+$simulator attach-agent $dns3 $h3

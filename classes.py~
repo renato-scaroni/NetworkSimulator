@@ -1,0 +1,19 @@
+class EP3Simulator:
+	def __init__(self, entities):
+		self.entities = entities
+		
+	def simulate(self, outputFile):
+		pass
+		
+class Entity:
+	def __init__(self, name):
+		pass
+	
+class Host(Entity):
+	def __init__(self, name):
+		Entity.__init__(self, name)
+	
+class Router(Entity):
+	def __init__(self, name, interfacesCount):
+		Entity.__init__(self, name)
+		self.interfacesCount = interfacesCount

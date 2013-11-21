@@ -32,16 +32,28 @@ def CreateLink(data, entities):
 	else:
 		destPort = -1
 
-	if type(entities[origDevice]) == type(Host("")):
+	if entities[origDevice].GetType() == Entity.host:
 		entities[origDevice].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), destDevice[0], int(destPort))
 	else:
 		entities[origDevice].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), destDevice[0], int(destPort), int(origPort))
 
 
-	if type(entities[destDevice[0]]) == type(Host("")):
+	if entities[destDevice[0]].GetType() == Entity.host:
 		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort))
 	else:
 		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), int(destPort))
+
+def ConfigureHost(h, data):
+	h.SetIps(data[2], data[3], data[4])
+
+def ConfigureRouterRoutes(r, data):
+	r.SetIps(data[2], data[3], data[4])
+
+def ConfigureRouterIps(r, data):
+	r.SetIps(data[2], data[3], data[4])
+
+def ConfigureRouterPerformance(r, data):
+	r.SetIps(data[2], data[3], data[4])
 
 def readInput(inputFilename, outputFilename):
 	entities = {}
@@ -60,7 +72,16 @@ def readInput(inputFilename, outputFilename):
 		if data[0] == "$simulator":
 			if data[1] == "duplex-link":
 				CreateLink(data, entities)
-
+			if data[1][1:] in entities.keys():
+				if entities[data[1][1:]].GetType() == Entity.host:
+					ConfigureHost(entities[data[1][1:]], data)
+				elif entities[data[1][1:]].GetType() == Entity.router:
+					if data[2] == "performance":
+						ConfigureRouterPerformance(entities[data[1][1:]], data)
+					elif data[2] == "route":
+						ConfigureRouterRoute(entities[data[1][1:]], data)
+					else:
+						ConfigureRouterIps(entities[data[1][1:]], data)
 	f.close()
 	simulator = EP3Simulator(entities)
 	simulator.simulate(outputFilename)

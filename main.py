@@ -5,7 +5,15 @@ import os
 from classes import *
 
 def CreateAgent(name, param):
-	print "criando agente ", name
+	if "HTTPClient" in param:
+		return HttpClient(name)
+	if "HTTPServer" in param:
+		return HttpServer(name)
+	if "DNSServer" in param:
+		return DNSServer(name)
+	if "Sniffer" in param:
+		return Sniffer(name)
+
 
 def CreateDevice(name, param):
 	if "$simulator host" in param:
@@ -137,7 +145,7 @@ def readInput(inputFilename, outputFilename):
 
 
 	f.close()
-	simulator = EP3Simulator(entities)
+	simulator = EP3Simulator(entities, agents)
 	if len(commands) > 0:
 		simulator.SetCommands(commands)
 	simulator.Simulate(outputFilename)

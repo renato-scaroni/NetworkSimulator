@@ -1,13 +1,18 @@
 from operator import itemgetter
+import sys
 
 class EP3Simulator(object):
-	def __init__(self, entities):
+	def __init__(self, entities, agents):
 		self.entities = entities
+		self.agents = agents
 		self.commands = []
 		self.clock = 0
 
 	def SetCommands(self, c): # a command is a tuple (time, commandString)
 		self.commands = c
+
+	def ParseAndExecuteCommand(self, cmd):
+		print cmd
 
 	def Simulate(self, outputFile):
 		if len(self.commands) > 0:
@@ -15,11 +20,16 @@ class EP3Simulator(object):
 			print "commands to execute :"
 			for c in self.commands:
 				print c
+			self.time = float(self.commands[0][0])
+		else:
+			print "Nao existem comandos a serem executados"
+			return
 
 		keepSimulating = True
 		while keepSimulating and len(self.commands) > 0:
 			for c in self.commands:
 				if c > self.clock:
+					self.ParseAndExecuteCommand(c[1])
 					pass # Execute the little bastard
 
 			keepSimulating = False
@@ -30,10 +40,17 @@ class EP3Simulator(object):
 		
 class Agent(object):
 	def __init__(self, name):
+		self.owner = ""
+		self._name = name
 		pass	
+
+	def SetOwner(self, o):
+		print self._name, "associado a", o
+		self.owner = o
 
 class Sniffer(Agent):
 	def __init__(self, name):
+		Agent.__init__(self, name)
 		print "sniffer criado ", name
 
 	def SetLogFile(self, path):
@@ -42,14 +59,17 @@ class Sniffer(Agent):
 
 class HttpClient(Agent):
 	def __init__(self, name):
+		Agent.__init__(self, name)
 		print "Http Server criado ", name
 
 class HttpServer(Agent):
 	def __init__(self, name):
+		Agent.__init__(self, name)
 		print "Http Client criado ", name
 
 class DNSServer(Agent):
 	def __init__(self, name):
+		Agent.__init__(self, name)
 		print "DNS Server criado ", name
 
 class Link(object):
@@ -89,7 +109,9 @@ class Entity(object):
 		Entity.host = type(Host("")) #save the type of a host for future consultation
 		Entity.router = type(Router("", -1))#save the type of a router for future consultation
 		self.agents = {}
-		pass
+		self.sendBuffer = []
+		self.recBuffer = []
+		self._name = name
 
 	def Loop():
 		pass
@@ -98,8 +120,8 @@ class Entity(object):
 		return self._type
 
 	def AttachAgent(self, agName, ag):
-		print agName, "associado a", self._name
 		self.agents[agName]  = ag
+		ag.SetOwner(self._name)
 
 class Host(Entity):
 	def __init__(self):
@@ -109,7 +131,6 @@ class Host(Entity):
 			return
 		Entity.__init__(self, name)
 		print "Host criado ", name
-		self._name = name
 
 	def Loop(self):
 		print "executando host ", self._name

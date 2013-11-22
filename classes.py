@@ -110,7 +110,7 @@ class Host(Entity):
 
 	def Loop(self):
 		print "executando host ", self._name
-		return len(link.packets) > 0
+		return len(self.link.packets) > 0
 
 	def SetLink(self, d, s, dest, destp):
 		newLink = Link()

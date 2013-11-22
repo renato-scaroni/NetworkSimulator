@@ -4,17 +4,19 @@ import sys
 import os
 from classes import *
 
-def createObject(name, param):
-	print param
+def CreateAgent(name, param):
+	print "criando agente ", name
+
+def CreateDevice(name, param):
 	if "$simulator host" in param:
-		print "neam"
 		return Host(name)
 	elif "$simulator router" in param:
 		numberOfInterfaces = int(param.split(" ")[3].split("]")[0])
 		return Router(name, numberOfInterfaces)
 
 def readInput(inputFilename, outputFilename):
-	entities = []
+	entities = {}
+	agents = {}
 	f = open(inputFilename, "rb")
 	for line in f:
 		data = line.split(" ")
@@ -22,7 +24,13 @@ def readInput(inputFilename, outputFilename):
 			name = data[1]
 			param = ""
 			for i in range(2, len(data)): param += " " + data[i]
-			entities.append(createObject(name, param))
+			if "$simulator host" in param or "$simulator router" in param:
+				entities[name] = CreateDevice(name, param)
+			else
+				agents[name] = CreateAgent
+
+
+
 	f.close()
 	simulator = EP3Simulator(entities)
 	simulator.simulate(outputFilename)

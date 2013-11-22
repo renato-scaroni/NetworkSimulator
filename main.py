@@ -98,6 +98,7 @@ def AttachSniffer(ag, ent, data):
 def readInput(inputFilename, outputFilename):
 	entities = {}
 	agents = {}
+	commands = []
 	f = open(inputFilename, "rb")
 	for line in f:
 		data = line.split(" ")
@@ -131,8 +132,14 @@ def readInput(inputFilename, outputFilename):
 				else:
 					AttachAgent(data[2][1:], entities[CutLineEnding(data[3][1:])], agents)
 
+			if data[1] == "at": #reads a command (see the simulator class for comment)
+				commands.append((float(data[2]), CutLineEnding(" ".join(data[3:]))))
+
+
 	f.close()
 	simulator = EP3Simulator(entities)
+	if len(commands) > 0:
+		simulator.SetCommands(commands)
 	simulator.simulate(outputFilename)
 
 

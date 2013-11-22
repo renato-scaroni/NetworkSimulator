@@ -1,16 +1,21 @@
 class EP3Simulator(object):
 	def __init__(self, entities):
 		self.entities = entities
-		
+		self.commands = []
+
+	def SetCommands(self, c): # a command is a tuple (time, commandString)
+		self.commands = c
+
 	def simulate(self, outputFile):
 		print ""
+		if len(self.commands) > 0:
+			print "commands to execute :"
+			for c in self.commands:
+				print c
+
 		for k in self.entities.keys():
 			self.entities[k].Loop()
 			self.entities[k].PrintLinks()
-			# if self.entities[k].GetType() == Entity.router:
-			# 	print self.entities[k]._name
-			# 	for r in self.entities[k].routes.keys():
-			# 		print self.entities[k].routes[r]
 		
 class Agent(object):
 	def __init__(self, name):

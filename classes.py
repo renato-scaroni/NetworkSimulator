@@ -11,6 +11,9 @@ class EP3Simulator(object):
 	def SetCommands(self, c): # a command is a tuple (time, commandString)
 		self.commands = c
 
+	def ParseAndExecuteCommand(self, cmd):
+		print cmd
+
 	def Simulate(self, outputFile):
 		if len(self.commands) > 0:
 			self.commands = sorted(self.commands, key=itemgetter(0))
@@ -26,6 +29,7 @@ class EP3Simulator(object):
 		while keepSimulating and len(self.commands) > 0:
 			for c in self.commands:
 				if c > self.clock:
+					self.ParseAndExecuteCommand(c[1])
 					pass # Execute the little bastard
 
 			keepSimulating = False

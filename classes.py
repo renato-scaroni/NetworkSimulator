@@ -59,6 +59,7 @@ class Link(object):
 		self.destinationName = None
 		self.destinationPort = -1
 		self.sniffer = None
+		self.packets = []
 
 	def SetSniffer(self, s):
 		if self.destinationPort == -1:
@@ -98,7 +99,6 @@ class Entity(object):
 		self.agents[agName]  = ag
 
 class Host(Entity):
-	links = None
 	def __init__(self):
 		pass
 	def __init__(self, name):
@@ -110,7 +110,7 @@ class Host(Entity):
 
 	def Loop(self):
 		print "executando host ", self._name
-		return False
+		return len(link.packets) > 0
 
 	def SetLink(self, d, s, dest, destp):
 		newLink = Link()
@@ -211,4 +211,6 @@ class Router(Entity):
 
 	def Loop(self):
 		print "executando router ", self._name
+		for l in self.links:
+			if len(l.packets) > 0: return True
 		return False

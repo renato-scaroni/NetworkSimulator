@@ -26,7 +26,7 @@ def readInput(inputFilename, outputFilename):
 			for i in range(2, len(data)): param += " " + data[i]
 			if "$simulator host" in param or "$simulator router" in param:
 				entities[name] = CreateDevice(name, param)
-			else
+			else:
 				agents[name] = CreateAgent
 
 

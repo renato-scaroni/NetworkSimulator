@@ -1,3 +1,5 @@
+from operator import itemgetter
+
 class EP3Simulator(object):
 	def __init__(self, entities):
 		self.entities = entities
@@ -9,6 +11,7 @@ class EP3Simulator(object):
 	def simulate(self, outputFile):
 		print ""
 		if len(self.commands) > 0:
+			self.commands = sorted(self.commands, key=itemgetter(0))
 			print "commands to execute :"
 			for c in self.commands:
 				print c

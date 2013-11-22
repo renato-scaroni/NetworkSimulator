@@ -43,17 +43,57 @@ def CreateLink(data, entities):
 	else:
 		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), int(destPort))
 
+def CutLineEnding (s):
+	if s[-1] == '\n':
+		return s[:-1]
+	return s
+
 def ConfigureHost(h, data):
 	h.SetIps(data[2], data[3], data[4])
 
 def ConfigureRouterRoutes(r, data):
-	r.SetIps(data[2], data[3], data[4])
+	i = 3
+	print "config de rota para", data[1][1:]
+	while i < len(data) - 1: 
+		r.SetIps(data[i], CutLineEnding(data[i+1]))
+		i = i + 2
 
 def ConfigureRouterIps(r, data):
-	r.SetIps(data[2], data[3], data[4])
+	i = 2
+	print "\n", data[1][1:], ":"
+	while i < len(data) - 1: 
+		r.SetIps(CutLineEnding(data[i+1]), data[i])
+		i = i + 2
 
 def ConfigureRouterPerformance(r, data):
-	r.SetIps(data[2], data[3], data[4])
+	print "config de perforance para", data[1][1:]
+	r.SetProcTime(data[3][:-2])
+	i = 4
+	while i < len(data) - 1: 
+		r.SetMaxQueueForPort(int(data[i]), CutLineEnding(data[i+1]))
+		i = i + 2
+
+def AttachAgent(agName, ent, agents):
+	ent.AttachAgent(agName, agents[agName])
+
+def AttachSniffer(ag, ent, data):
+	#get the edges in a link
+	d1 = data[3][1:].split(".") #device 1
+	d2 = data[4][1:].split(".") #device 2
+
+	#get links (both ways)
+	if len(d1) > 1:
+		l1 = ent[d1[0]].GetLink(d1[1])
+	else:
+		l1 = ent[d1[0]].GetLink()
+
+	if len(d2) > 1:
+		l2 = ent[d2[0]].GetLink(d2[1])
+	else:
+		l2 = ent[d2[0]].GetLink()
+
+	l1.SetSniffer(ag[data[2][1:]])
+	l2.SetSniffer(ag[data[2][1:]])
 
 def readInput(inputFilename, outputFilename):
 	entities = {}
@@ -61,6 +101,7 @@ def readInput(inputFilename, outputFilename):
 	f = open(inputFilename, "rb")
 	for line in f:
 		data = line.split(" ")
+	
 		if data[0] == "set":   #hora de criar um objeto
 			name = data[1]
 			param = ""
@@ -69,7 +110,8 @@ def readInput(inputFilename, outputFilename):
 				entities[name] = CreateDevice(name, param)
 			else:
 				agents[name] = CreateAgent(name, param)
-		if data[0] == "$simulator":
+	
+		if data[0] == "$simulator": #configure Host or Router
 			if data[1] == "duplex-link":
 				CreateLink(data, entities)
 			if data[1][1:] in entities.keys():
@@ -79,9 +121,16 @@ def readInput(inputFilename, outputFilename):
 					if data[2] == "performance":
 						ConfigureRouterPerformance(entities[data[1][1:]], data)
 					elif data[2] == "route":
-						ConfigureRouterRoute(entities[data[1][1:]], data)
+						ConfigureRouterRoutes(entities[data[1][1:]], data)
 					else:
 						ConfigureRouterIps(entities[data[1][1:]], data)
+
+			if data[1] == "attach-agent": # Associate Agent with Host or Router
+				if data[2][1:].startswith("sniffer"):
+					AttachSniffer(agents, entities, data)
+				else:
+					AttachAgent(data[2][1:], entities[CutLineEnding(data[3][1:])], agents)
+
 	f.close()
 	simulator = EP3Simulator(entities)
 	simulator.simulate(outputFilename)

@@ -3,9 +3,14 @@ class EP3Simulator(object):
 		self.entities = entities
 		
 	def simulate(self, outputFile):
+		print ""
 		for k in self.entities.keys():
 			self.entities[k].Loop()
 			self.entities[k].PrintLinks()
+			# if self.entities[k].GetType() == Entity.router:
+			# 	print self.entities[k]._name
+			# 	for r in self.entities[k].routes.keys():
+			# 		print self.entities[k].routes[r]
 		
 class Agent(object):
 	def __init__(self, name):
@@ -14,6 +19,10 @@ class Agent(object):
 class Sniffer(Agent):
 	def __init__(self, name):
 		print "sniffer criado ", name
+
+	def SetLogFile(self, path):
+		print name, "log salvo em", path
+		self.logPath = path
 
 class HttpClient(Agent):
 	def __init__(self, name):
@@ -33,6 +42,14 @@ class Link(object):
 		self.speed = -1
 		self.destinationName = None
 		self.destinationPort = -1
+		self.sniffer = None
+
+	def SetSniffer(self, s):
+		if self.destinationPort == -1:
+			print "sniffer no link para", self.destinationName
+		else:
+			print "sniffer no link para", str(self.destinationName)+ "." +str(self.destinationPort)
+		self.sniffer = s
 
 	def SetSpeed(self, s):
 		self.speed = s
@@ -44,12 +61,14 @@ class Link(object):
 		self.destinationName = d
 		self.destinationPort = p #if its not a router, it should be -1
 
-class Entity(object):
-	_sniffer = None
+# May also be refered to as a device. Its an abstraction
+# for both Host and Router
+class Entity(object): 
 	def __init__(self, name):
 		self._type = type(self)
 		Entity.host = type(Host("")) #save the type of a host for future consultation
 		Entity.router = type(Router("", -1))#save the type of a router for future consultation
+		self.agents = {}
 		pass
 
 	def Loop():
@@ -57,6 +76,10 @@ class Entity(object):
 
 	def GetType(self):
 		return self._type
+
+	def AttachAgent(self, agName, ag):
+		print agName, "associado a", self._name
+		self.agents[agName]  = ag
 
 class Host(Entity):
 	links = None
@@ -79,7 +102,7 @@ class Host(Entity):
 		newLink.SetDelay(d)
 		newLink.SetDestination(dest, destp)
 
-		self.links = newLink
+		self.link = newLink
 
 	def SetIps(self, host, router, dns):
 		self.me = host
@@ -90,11 +113,14 @@ class Host(Entity):
 		print "router", router
 		print "DNS:", dns[:-1], "\n"
 
-	def PrintLinks(self):		
-		if not self.links.destinationPort == -1:
-			print self._name, "-->", str(self.links.destinationName)+"."+str(self.links.destinationPort), self.links.speed, "ms", self.links.delay, "Mbps"
+	def GetLink(self):
+		return self.link
+
+	def PrintLinks(self):
+		if not self.link.destinationPort == -1:
+			print self._name, "-->", str(self.link.destinationName)+"."+str(self.link.destinationPort), str(self.link.speed)+"ms", str(self.link.delay)+ "Mbps"
 		else:
-			print self._name, "-->", self.links.destinationName, self.links.speed, "ms", self.links.delay, "Mbps"
+			print self._name, "-->", self.link.destinationName, str(self.link.speed)+"ms", str(self.link.delay), "Mbps"
 
 class Router(Entity):
 	def __init__(self):
@@ -106,10 +132,14 @@ class Router(Entity):
 		Entity.__init__(self, name)
 		self.interfacesCount = interfacesCount
 		
-		#create dummy links and initialize them
-		self.links = []
+		self.links = [] #create dummy links
+		#List that will contain the max packet each interface
+		#can handle 
+		self.maxPacketQueue = [] 
+		#initialize the lists
 		for i in range (interfacesCount):
 			self.links.append(Link())
+			self.maxPacketQueue.append(0)
 		
 		print "Router criado ", name
 		
@@ -118,6 +148,15 @@ class Router(Entity):
 		#this list will keep tuples with the ports and ips 
 		#that will indentify this router
 		self.ips = [] 
+
+		#this dict will keep the routes table
+		self.routes = {}
+
+		#time consumed by the router to process 1 packet
+		self.procTime = 0
+
+	def SetRoutes(self, orig, dest):
+		self.routes[orig] = dest
 
 	def SetLink(self, d, s, dest, destp, port):
 		if port > self.interfacesCount:
@@ -128,16 +167,30 @@ class Router(Entity):
 		self.links[port].SetDelay(d)
 		self.links[port].SetDestination(dest, destp)
 
+	def SetIps(self, ip, port):
+		self.ips.append((ip, port))
+		print "orig", ip
+		print "dest", port, "\n"
+
+	def SetProcTime(self, p):
+		print "Tempo de processamento de pacotes", p
+		self.procTime = p
+
+	def SetMaxQueueForPort(self, port, l):		
+		self.maxPacketQueue[port] = l
+		print "porta", port
+		print "limite", l, "\n"
+
+	def GetLink(self, port):
+		return self.links[int(port)]
+
 	def PrintLinks(self):
 		for i in range(self.interfacesCount):
 			l = self.links[i]
 			if not l.destinationPort == -1:
-				print self._name+"."+str(i), "-->", str(l.destinationName) + "."+ str(l.destinationPort), l.speed, "ms", l.delay, "Mbps"
+				print self._name+"."+str(i), "-->", str(l.destinationName) + "."+ str(l.destinationPort), str(l.speed)+"ms", str(l.delay)+ "Mbps"
 			else:
-				print self._name+"."+str(i), "-->", l.destinationName, l.speed, "ms", l.delay, "Mbps"
-
-	def SetIps(self, ip, port):
-		self.ips.append((ip, port))
+				print self._name+"."+str(i), "-->", l.destinationName, str(l.speed)+"ms", str(l.delay)+ "Mbps"
 
 	def Loop(self):
 		print "executando router ", self._name

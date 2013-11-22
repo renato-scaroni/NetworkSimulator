@@ -78,6 +78,9 @@ class Link(object):
 		self.destinationName = d
 		self.destinationPort = p #if its not a router, it should be -1
 
+	def ExchangePackets(self, packets):
+		pass
+
 # May also be refered to as a device. Its an abstraction
 # for both Host and Router
 class Entity(object): 

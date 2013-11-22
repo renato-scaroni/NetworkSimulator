@@ -140,7 +140,7 @@ def readInput(inputFilename, outputFilename):
 	simulator = EP3Simulator(entities)
 	if len(commands) > 0:
 		simulator.SetCommands(commands)
-	simulator.simulate(outputFilename)
+	simulator.Simulate(outputFilename)
 
 
 def main():

@@ -1,21 +1,32 @@
+from operator import itemgetter
+
 class EP3Simulator(object):
 	def __init__(self, entities):
 		self.entities = entities
 		self.commands = []
+		self.clock = 0
 
 	def SetCommands(self, c): # a command is a tuple (time, commandString)
 		self.commands = c
 
-	def simulate(self, outputFile):
-		print ""
+	def Simulate(self, outputFile):
 		if len(self.commands) > 0:
+			self.commands = sorted(self.commands, key=itemgetter(0))
 			print "commands to execute :"
 			for c in self.commands:
 				print c
 
-		for k in self.entities.keys():
-			self.entities[k].Loop()
-			self.entities[k].PrintLinks()
+		keepSimulating = True
+		while keepSimulating and len(self.commands) > 0:
+			for c in self.commands:
+				if c > self.clock:
+					pass # Execute the little bastard
+
+			keepSimulating = False
+			for k in self.entities.keys():
+				keepSimulating = self.entities[k].Loop() or keepSimulating
+				self.entities[k].PrintLinks()
+			self.clock += 0.001
 		
 class Agent(object):
 	def __init__(self, name):
@@ -99,6 +110,7 @@ class Host(Entity):
 
 	def Loop(self):
 		print "executando host ", self._name
+		return False
 
 	def SetLink(self, d, s, dest, destp):
 		newLink = Link()
@@ -199,3 +211,4 @@ class Router(Entity):
 
 	def Loop(self):
 		print "executando router ", self._name
+		return False

@@ -54,7 +54,7 @@ $simulator attach-agent $sniffer2 $h1 $r0.1 "/tmp/sniffer2"
 
 # comandos
 $simulator at 0.5 "httpc0 GET h2"
-$simulator at 0.6 "httpc1 GET 192.168.2.2"
 $simulator at 0.6 "httpc1 GET h0"
-$simulator at 0.7 "httpc0 GET h2"
 $simulator at 4.0 "finish"
+$simulator at 0.7 "httpc0 GET h2"
+$simulator at 0.6 "httpc1 GET 192.168.2.2"

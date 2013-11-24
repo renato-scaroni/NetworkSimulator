@@ -1,18 +1,24 @@
 from operator import itemgetter
 import sys
 
+simulatorSingleton = None
+packetSize = 1024 * 8 * 500 #500 kbytes
+
 class EP3Simulator(object):
 	def __init__(self, entities, agents):
 		self.entities = entities
 		self.agents = agents
 		self.commands = []
 		self.clock = 0
+		simulatorSingleton = self
 
 	def SetCommands(self, c): # a command is a tuple (time, commandString)
 		self.commands = c
 
 	def ParseAndExecuteCommand(self, cmd):
-		print cmd
+		print "Comando: " + cmd
+		# $simulator at 0.5 "httpc0 GET h2"
+
 
 	def Simulate(self, outputFile):
 		if len(self.commands) > 0:
@@ -30,7 +36,6 @@ class EP3Simulator(object):
 			for c in self.commands:
 				if c > self.clock:
 					self.ParseAndExecuteCommand(c[1])
-					pass # Execute the little bastard
 
 			keepSimulating = False
 			for k in self.entities.keys():
@@ -72,6 +77,12 @@ class DNSServer(Agent):
 		Agent.__init__(self, name)
 		print "DNS Server criado ", name
 
+class Packet(object):
+	def __init__(self, destinationHost, destinationPort):
+		self.destinationHost = destinationHost
+		self.destinationPort = destinationPort
+		self.data = None
+		
 class Link(object):
 	def __init__(self):
 		self.delay = -1
@@ -98,8 +109,10 @@ class Link(object):
 		self.destinationName = d
 		self.destinationPort = p #if its not a router, it should be -1
 
-	def ExchangePackets(self, packets):
-		pass
+	def ExchangePackets(self): #restringir a velocidade
+		targetEntity = simulatorSingleton.entities[self.destinationName]
+		for p in self.packets:
+			targetEntity.ReceivePacket(p)
 
 # May also be refered to as a device. Its an abstraction
 # for both Host and Router
@@ -118,6 +131,9 @@ class Entity(object):
 
 	def GetType(self):
 		return self._type
+
+	def ReceivePacket(self, packet):
+		pass
 
 	def AttachAgent(self, agName, ag):
 		self.agents[agName]  = ag
@@ -142,7 +158,6 @@ class Host(Entity):
 		newLink.SetSpeed(s)
 		newLink.SetDelay(d)
 		newLink.SetDestination(dest, destp)
-
 		self.link = newLink
 
 	def SetIps(self, host, router, dns):
@@ -162,6 +177,17 @@ class Host(Entity):
 			print self._name, "-->", str(self.link.destinationName)+"."+str(self.link.destinationPort), str(self.link.speed)+"ms", str(self.link.delay)+ "Mbps"
 		else:
 			print self._name, "-->", self.link.destinationName, str(self.link.speed)+"ms", str(self.link.delay), "Mbps"
+
+	def SendPackets(self, dataSize, destinationName, destinationPort):
+		# Checar se eh um ip ou um endereco
+		# if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",ip):
+		numPackets = dataSize / packetSize
+		for i in range(0, numPackets):
+			self.link.packets.append(Packet(destinationName, destinationName))
+
+	def ReceivePacket(self, packet):
+		if packet.destinationName == self.name:
+			print "Packet chegou no lugar certo"
 
 class Router(Entity):
 	def __init__(self):
@@ -238,3 +264,9 @@ class Router(Entity):
 		for l in self.links:
 			if len(l.packets) > 0: return True
 		return False
+
+	def ReceivePacket(self, packet):
+		for i in range (interfacesCount):
+			if len(self.links[i].packets) < self.maxPacketQueue[i]: #sim, isso eh um broadcast
+				self.links[i].packets.append(packet)
+

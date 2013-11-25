@@ -4,6 +4,29 @@ import sys
 simulatorSingleton = None
 packetSize = 1024 * 8 * 500 #500 kbytes
 
+class Package(object):
+	def __init__(self, header, data):
+		super(Package, self).__init__()
+		self.header = header
+		self.data = data
+
+class Header(object):
+	def __init__(self):
+		super(Header, self).__init__()
+
+class UDPHeader(Header):
+	def __init__(self, arg):
+		super(UDPHeader, self).__init__()
+		self.arg = arg
+		
+class IPHeader(Header):
+	def __init__(self, size, orig, dest, prot):
+		super(IPHeader, self).__init__()
+		self.size = size
+		self.dest = dest
+		self.orig = orig
+		self.prot = prot
+
 class EP3Simulator(object):
 	def __init__(self, entities, agents):
 		self.entities = entities
@@ -42,7 +65,7 @@ class EP3Simulator(object):
 				keepSimulating = self.entities[k].Loop() or keepSimulating
 				self.entities[k].PrintLinks()
 			self.clock += 0.001
-		
+
 class Agent(object):
 	def __init__(self, name):
 		self.owner = ""

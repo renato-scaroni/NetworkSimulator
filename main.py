@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import sys
 import os
 from classes import *
@@ -13,7 +12,6 @@ def CreateAgent(name, param):
 		return DNSServer(name)
 	if "Sniffer" in param:
 		return Sniffer(name)
-
 
 def CreateDevice(name, param):
 	if "$simulator host" in param:

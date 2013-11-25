@@ -6,6 +6,7 @@ packetSize = 1024 * 8 * 500 #500 kbytes
 
 class EP3Simulator(object):
 	def __init__(self, entities, agents):
+		global simulatorSingleton
 		self.entities = entities
 		self.agents = agents
 		self.commands = []
@@ -17,8 +18,14 @@ class EP3Simulator(object):
 
 	def ParseAndExecuteCommand(self, cmd):
 		print "Comando: " + cmd
-		# $simulator at 0.5 "httpc0 GET h2"
+		splittedCmd = cmd.replace("\"", "").replace("'", "").split(" ")
 
+		if cmd == "\"finish\"":
+			return False
+
+		agent = simulatorSingleton.agents[splittedCmd[0]]
+
+		return True
 
 	def Simulate(self, outputFile):
 		if len(self.commands) > 0:
@@ -32,10 +39,11 @@ class EP3Simulator(object):
 			return
 
 		keepSimulating = True
-		while keepSimulating and len(self.commands) > 0:
+		while keepSimulating or len(self.commands) > 0:
 			for c in self.commands:
-				if c > self.clock:
-					self.ParseAndExecuteCommand(c[1])
+				if int(c[0]) > self.clock:
+					print "CLOCK " + str(self.clock)
+					if not self.ParseAndExecuteCommand(c[1]): self.commands = []
 
 			keepSimulating = False
 			for k in self.entities.keys():

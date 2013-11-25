@@ -43,6 +43,7 @@ class EP3Simulator(object):
 			for c in self.commands:
 				if float(c[0]) < float(self.clock):
 					if not self.ParseAndExecuteCommand(c[1]): self.commands = []
+					else: self.commands = [s for s in self.commands if s != c]
 
 			keepSimulating = False
 			for k in self.entities.keys():

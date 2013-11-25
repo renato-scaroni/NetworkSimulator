@@ -39,15 +39,20 @@ def CreateLink(data, entities):
 		destPort = -1
 
 	if entities[origDevice].GetType() == Entity.host:
-		entities[origDevice].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), destDevice[0], int(destPort))
+		entities[origDevice].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), destDevice[0], int(destPort), entities[destDevice[0]])
+		print "CREATING LINK ", origDevice, destDevice[0]
 	else:
-		entities[origDevice].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), destDevice[0], int(destPort), int(origPort))
+		entities[origDevice].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), destDevice[0], int(destPort), int(origPort), entities[destDevice[0]])
+		print "CREATING LINK ", origDevice, destDevice[0]
+
 
 
 	if entities[destDevice[0]].GetType() == Entity.host:
-		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort))
+		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), entities[destDevice[0]])
+		print "CREATING LINK ", destDevice[0], origDevice
 	else:
-		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), int(destPort))
+		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), int(destPort), entities[destDevice[0]])
+		print "CREATING LINK ", destDevice[0], origDevice
 
 def CutLineEnding (s):
 	if s[-1] == '\n':
@@ -61,7 +66,7 @@ def ConfigureRouterRoutes(r, data):
 	i = 3
 	print "config de rota para", data[1][1:]
 	while i < len(data) - 1: 
-		r.SetIps(data[i], CutLineEnding(data[i+1]))
+		r.SetRoutes(data[i], CutLineEnding(data[i+1]))
 		i = i + 2
 
 def ConfigureRouterIps(r, data):
@@ -90,16 +95,21 @@ def AttachSniffer(ag, ent, data):
 	#get links (both ways)
 	if len(d1) > 1:
 		l1 = ent[d1[0]].GetLink(d1[1])
+		l1.SetSniffer(ag[data[2][1:]])
 	else:
 		l1 = ent[d1[0]].GetLink()
+		for l in l1:
+			l.SetSniffer(ag[data[2][1:]])	
 
 	if len(d2) > 1:
 		l2 = ent[d2[0]].GetLink(d2[1])
+		l2.SetSniffer(ag[data[2][1:]])
 	else:
 		l2 = ent[d2[0]].GetLink()
+		for l in l2:
+			l.SetSniffer(ag[data[2][1:]])	
 
-	l1.SetSniffer(ag[data[2][1:]])
-	l2.SetSniffer(ag[data[2][1:]])
+	
 
 def readInput(inputFilename, outputFilename):
 	entities = {}

@@ -4,11 +4,68 @@ import sys
 simulatorSingleton = None
 packetSize = 1024 * 8 * 500 #500 kbytes
 
-class Package(object):
-	def __init__(self, header, data):
-		super(Package, self).__init__()
-		self.header = header
+class EP3Simulator(object):
+	def __init__(self, entities, agents):
+		global simulatorSingleton
+		self.entities = entities
+		self.agents = agents
+		self.commands = []
+		self.clock = 0
+		simulatorSingleton = self
+
+	def SetCommands(self, c): # a command is a tuple (time, commandString)
+		self.commands = c
+
+	def ParseAndExecuteCommand(self, cmd):
+		print "Comando: " + cmd
+		splittedCmd = cmd.replace("\"", "").replace("'", "").split(" ") #WTF???
+
+		if cmd == "\"finish\"":
+			return False
+
+		agent = simulatorSingleton.agents[splittedCmd[0]]
+		if agent.type == "httpc" and splittedCmd[1] == "GET":
+			agent.Get(splittedCmd[2], self.entities)
+
+
+		return True
+
+	def Simulate(self, outputFile):
+		if len(self.commands) > 0:
+			self.commands = sorted(self.commands, key=itemgetter(0))
+			print "commands to execute :"
+			for c in self.commands:
+				print c
+			self.time = float(self.commands[0][0])
+		else:
+			print "Nao existem comandos a serem executados"
+			return
+
+		keepSimulating = True
+		while keepSimulating or len(self.commands) > 0:
+			for c in self.commands:
+				if float(c[0]) < float(self.clock):
+					if not self.ParseAndExecuteCommand(c[1]): self.commands = []
+					else: self.commands = [s for s in self.commands if s != c]
+
+			keepSimulating = False
+			for k in self.entities.keys():
+				keepSimulating = self.entities[k].Loop(self.entities) or keepSimulating
+				# self.entities[k].PrintLinks()
+			self.clock += 0.001
+
+class Packet(object):
+	def __init__(self):
+		self.data = None
+		self.header = None
+		self.dataIsPacket = False
+
+	def SetHeader(self, h):
+		self.header = h
+
+	def SetData(self, data, dataIsPacket):
 		self.data = data
+		self.dataIsPacket = dataIsPacket
 
 class Header(object):
 	def __init__(self):
@@ -27,45 +84,6 @@ class IPHeader(Header):
 		self.orig = orig
 		self.prot = prot
 
-class EP3Simulator(object):
-	def __init__(self, entities, agents):
-		self.entities = entities
-		self.agents = agents
-		self.commands = []
-		self.clock = 0
-		simulatorSingleton = self
-
-	def SetCommands(self, c): # a command is a tuple (time, commandString)
-		self.commands = c
-
-	def ParseAndExecuteCommand(self, cmd):
-		print "Comando: " + cmd
-		# $simulator at 0.5 "httpc0 GET h2"
-
-
-	def Simulate(self, outputFile):
-		if len(self.commands) > 0:
-			self.commands = sorted(self.commands, key=itemgetter(0))
-			print "commands to execute :"
-			for c in self.commands:
-				print c
-			self.time = float(self.commands[0][0])
-		else:
-			print "Nao existem comandos a serem executados"
-			return
-
-		keepSimulating = True
-		while keepSimulating and len(self.commands) > 0:
-			for c in self.commands:
-				if c > self.clock:
-					self.ParseAndExecuteCommand(c[1])
-
-			keepSimulating = False
-			for k in self.entities.keys():
-				keepSimulating = self.entities[k].Loop() or keepSimulating
-				self.entities[k].PrintLinks()
-			self.clock += 0.001
-
 class Agent(object):
 	def __init__(self, name):
 		self.owner = ""
@@ -80,6 +98,7 @@ class Sniffer(Agent):
 	def __init__(self, name):
 		Agent.__init__(self, name)
 		print "sniffer criado ", name
+		self.type = "sniffer"
 
 	def SetLogFile(self, path):
 		print name, "log salvo em", path
@@ -89,22 +108,39 @@ class HttpClient(Agent):
 	def __init__(self, name):
 		Agent.__init__(self, name)
 		print "Http Server criado ", name
+		self.type = "httpc"
+
+	def isIp(self, dest):
+		dl = dest.split(".")
+		if len(dl) == 4:
+			for e in dl:
+				if not e.isdigit():
+					return False
+			return True
+		return False
+
+	def Get(self, dest, ent):
+		if self.isIp(dest):
+			print "To mandando o get"
+		else:
+			o = ent[self.owner]
+			hip = IPHeader(40, o.me, o.dns, 17)
+			udpp = Packet()
+			o.SendPackets(40, hip)
+			
 
 class HttpServer(Agent):
 	def __init__(self, name):
 		Agent.__init__(self, name)
 		print "Http Client criado ", name
+		self.type = "https"
+
 
 class DNSServer(Agent):
 	def __init__(self, name):
 		Agent.__init__(self, name)
 		print "DNS Server criado ", name
-
-class Packet(object):
-	def __init__(self, destinationHost, destinationPort):
-		self.destinationHost = destinationHost
-		self.destinationPort = destinationPort
-		self.data = None
+		self.type = "dnss"
 		
 class Link(object):
 	def __init__(self):
@@ -128,9 +164,10 @@ class Link(object):
 	def SetDelay (self, d):
 		self.delay = d
 
-	def SetDestination(self, d, p):
+	def SetDestination(self, d, p, destEnt):
 		self.destinationName = d
 		self.destinationPort = p #if its not a router, it should be -1
+		self.destination = destEnt
 
 	def ExchangePackets(self): #restringir a velocidade
 		targetEntity = simulatorSingleton.entities[self.destinationName]
@@ -162,26 +199,39 @@ class Entity(object):
 		self.agents[agName]  = ag
 		ag.SetOwner(self._name)
 
+	def GetRecLink(self, entities, sendLink):
+		self.dest = entities[sendLink.destinationName]
+		if self.dest.GetType() == Entity.router:
+			self.port = sendLink.destinationPort
+			return self.dest.links[self.port]
+		return self.dest.links[0]
+
 class Host(Entity):
-	def __init__(self):
-		pass
 	def __init__(self, name):
 		if(name == ""):
 			return
 		Entity.__init__(self, name)
 		print "Host criado ", name
+		self.links = []
 
-	def Loop(self):
+	def Loop(self, entities):
 		print "executando host ", self._name
-		return len(self.link.packets) > 0
+		self.cont = False
+		self.cont  = self.cont or len(self.links[0].packets) > 0
 
-	def SetLink(self, d, s, dest, destp):
+		self.recLink = self.GetRecLink(entities, self.links[0])
+
+		if len(self.recLink.packets) > 0:
+			self.ReceivePacket(self.recLink.packets[0], self.recLink)
+
+		return self.cont
+
+	def SetLink(self, d, s, dest, destp, destEnt):
 		newLink = Link()
-
 		newLink.SetSpeed(s)
 		newLink.SetDelay(d)
-		newLink.SetDestination(dest, destp)
-		self.link = newLink
+		newLink.SetDestination(dest, destp, destEnt)
+		self.links.append(newLink)
 
 	def SetIps(self, host, router, dns):
 		self.me = host
@@ -193,24 +243,40 @@ class Host(Entity):
 		print "DNS:", dns[:-1], "\n"
 
 	def GetLink(self):
-		return self.link
+		return self.links
 
 	def PrintLinks(self):
-		if not self.link.destinationPort == -1:
-			print self._name, "-->", str(self.link.destinationName)+"."+str(self.link.destinationPort), str(self.link.speed)+"ms", str(self.link.delay)+ "Mbps"
+		if not self.links.destinationPort == -1:
+			print self._name, "-->", str(self.links.destinationName)+"."+str(self.links.destinationPort), str(self.links.speed)+"ms", str(self.links.delay)+ "Mbps"
 		else:
-			print self._name, "-->", self.link.destinationName, str(self.link.speed)+"ms", str(self.link.delay), "Mbps"
+			print self._name, "-->", self.links.destinationName, str(self.links.speed)+"ms", str(self.links.delay), "Mbps"
 
-	def SendPackets(self, dataSize, destinationName, destinationPort):
+	def SendPackets(self, dataSize, header):
 		# Checar se eh um ip ou um endereco
 		# if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",ip):
 		numPackets = dataSize / packetSize
-		for i in range(0, numPackets):
-			self.link.packets.append(Packet(destinationName, destinationName))
 
-	def ReceivePacket(self, packet):
-		if packet.destinationName == self.name:
+		numPackets += 1
+
+		print "SENDING PACKET from", self._name, "to", header.dest
+		# now hosts have support for more then one link, 
+		# but they should not have more then one
+		for li in  self.links:
+			if not li.destinationName == self._name:
+				self.l = li
+
+		for i in range(0, numPackets):
+			p = Packet()
+			p.SetHeader(header)
+			self.l.packets.append(p)
+
+	def ReceivePacket(self, packet, recLink):
+		if packet.header.dest == self.me:
 			print "Packet chegou no lugar certo"
+		else:
+			print self._name, "transmitting packet"
+			self.links[0].packets.append(packet)
+		del recLink.packets[0]
 
 class Router(Entity):
 	def __init__(self):
@@ -246,16 +312,17 @@ class Router(Entity):
 		self.procTime = 0
 
 	def SetRoutes(self, orig, dest):
+		print "adding route", orig, dest
 		self.routes[orig] = dest
 
-	def SetLink(self, d, s, dest, destp, port):
+	def SetLink(self, d, s, dest, destp, port, destEnt):
 		if port > self.interfacesCount:
 			print "porta inexistente"
 			return
  
 		self.links[port].SetSpeed(s)
 		self.links[port].SetDelay(d)
-		self.links[port].SetDestination(dest, destp)
+		self.links[port].SetDestination(dest, destp, destEnt)
 
 	def SetIps(self, ip, port):
 		self.ips.append((ip, port))
@@ -282,14 +349,56 @@ class Router(Entity):
 			else:
 				print self._name+"."+str(i), "-->", l.destinationName, str(l.speed)+"ms", str(l.delay)+ "Mbps"
 
-	def Loop(self):
+	def Loop(self, entities):
 		print "executando router ", self._name
+		self.ret = False
 		for l in self.links:
-			if len(l.packets) > 0: return True
+			self.recLink = self.GetRecLink(entities, l)
+			if len(self.recLink.packets) > 0:
+				self.ReceivePacket(self.recLink.packets[0], self.recLink)
+				self.ret = True
+		return self.ret
+
+	def isIp(self, dest):
+		dl = dest.split(".")
+		if len(dl) == 4:
+			for e in dl:
+				if not e.isdigit():
+					return False
+			return True
 		return False
 
-	def ReceivePacket(self, packet):
-		for i in range (interfacesCount):
-			if len(self.links[i].packets) < self.maxPacketQueue[i]: #sim, isso eh um broadcast
-				self.links[i].packets.append(packet)
+	#check if dev a and b are in the same network
+	def SameSubNet(self, a, b):
+		aFields = a.split(".")
+		bFields = b.split(".")
+		self.ok = True
+		self.ok &= aFields[0] == bFields[0]
+		self.ok &= aFields[1] == bFields[1]
+		self.ok &= aFields[2] == bFields[2]
+		return self.ok
 
+	#checks if x could be indentifyed by ip address a
+	def IsTheSame(self, x, a):
+
+		if x.GetType == Entity.host:
+			if x.me == a:
+				return True
+		else:
+			for i in x.ips:
+				if i[0] == a:
+					return True
+		
+		return False
+
+	def ReceivePacket(self, packet, recLink):
+		del recLink.packets[0]
+		print self._name, "transmitting packet to", packet.header.dest		
+		for k in self.routes.keys():
+			if self.SameSubNet(packet.header.dest, k):
+				if not self.isIp(self.routes[k]):
+					self.links[int(self.routes[k])].packets.append(packet)
+				else:
+					for l in self.links:
+						if self.IsTheSame(l.destination, self.routes[k]):
+							l.packets.append(packet)

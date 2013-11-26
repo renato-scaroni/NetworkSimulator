@@ -165,10 +165,13 @@ class Sniffer(Agent):
 		toPrint += "Tamanho na camada superior: " + str(p.header.size) + "\n"
 		toPrint += "TTL: " + str(p.header.ttl) + "\n"
 		toPrint += "\n"
-		toPrint += "UDP: " + "\n"
-		toPrint += "Porta de origem: " + str(p.protHeader.orig) + "\n"
-		toPrint += "Porta de destino: " + str(p.protHeader.dest) + "\n"
-		toPrint += "Tamanho na camada superior: " + str(p.protHeader.size) + "\n"
+		if p.header.prot == 17:
+			toPrint += "UDP: " + "\n"
+			toPrint += "Porta de origem: " + str(p.protHeader.orig) + "\n"
+			toPrint += "Porta de destino: " + str(p.protHeader.dest) + "\n"
+			toPrint += "Tamanho na camada superior: " + str(p.protHeader.size) + "\n"
+		elif p.header.prot == 6: # ou que budegas for a porta do tcp
+			toPrint += "tranqueiras do tcp"
 		toPrint += "\n"
 		if p.data.ip == -1:	
 			toPrint += "Mensagem DNS: resolvendo nome para " + p.data.msg + "\n"

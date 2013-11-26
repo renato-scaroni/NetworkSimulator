@@ -48,10 +48,10 @@ def CreateLink(data, entities):
 
 
 	if entities[destDevice[0]].GetType() == Entity.host:
-		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), entities[destDevice[0]])
+		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), entities[origDevice])
 		print "CREATING LINK ", destDevice[0], origDevice
 	else:
-		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), int(destPort), entities[destDevice[0]])
+		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), int(destPort), entities[origDevice])
 		print "CREATING LINK ", destDevice[0], origDevice
 
 def CutLineEnding (s):
@@ -61,6 +61,7 @@ def CutLineEnding (s):
 
 def ConfigureHost(h, data):
 	h.SetIps(data[2], data[3], data[4])
+	DNSTABLE[h._name] = data[2]
 
 def ConfigureRouterRoutes(r, data):
 	i = 3

@@ -3,6 +3,8 @@ import sys
 
 simulatorSingleton = None
 packetSize = 1024 * 8 * 500 #500 kbytes
+UDPID = 0
+DNSTABLE = {}
 
 class EP3Simulator(object):
 	def __init__(self, entities, agents):
@@ -41,6 +43,9 @@ class EP3Simulator(object):
 			print "Nao existem comandos a serem executados"
 			return
 
+		for k in self.entities.keys():
+			self.entities[k].PrintLinks()
+
 		keepSimulating = True
 		while keepSimulating or len(self.commands) > 0:
 			for c in self.commands:
@@ -58,40 +63,49 @@ class Packet(object):
 	def __init__(self):
 		self.data = None
 		self.header = None
-		self.dataIsPacket = False
 
 	def SetHeader(self, h):
 		self.header = h
 
-	def SetData(self, data, dataIsPacket):
+	def SetProtHeader(self, h):
+		self.protHeader = h
+
+	def SetData(self, data):
 		self.data = data
-		self.dataIsPacket = dataIsPacket
 
 class Header(object):
 	def __init__(self):
 		super(Header, self).__init__()
 
+	def SetSize(self, s):
+		self.size = s #int
+
 class UDPHeader(Header):
-	def __init__(self, arg):
+	# orig e dest are the port used by the service
+	def __init__(self, orig, dest):
 		super(UDPHeader, self).__init__()
-		self.arg = arg
-		
+		self.dest = dest #string
+		self.orig = orig #string
+		global UDPID
+		self.id = UDPID
+		UDPID += 1
+
 class IPHeader(Header):
-	def __init__(self, size, orig, dest, prot):
+	def __init__(self, orig, dest, prot, ttl):
 		super(IPHeader, self).__init__()
-		self.size = size
-		self.dest = dest
-		self.orig = orig
-		self.prot = prot
+		self.dest = dest #string
+		self.orig = orig #string
+		self.prot = prot #int
+		self.ttl = ttl
 
 class Agent(object):
 	def __init__(self, name):
-		self.owner = ""
+		self.owner = None
 		self._name = name
 		pass	
 
 	def SetOwner(self, o):
-		print self._name, "associado a", o
+		print self._name, "associado a", o._name
 		self.owner = o
 
 class Sniffer(Agent):
@@ -104,11 +118,19 @@ class Sniffer(Agent):
 		print name, "log salvo em", path
 		self.logPath = path
 
+class DNSMessage:
+	def __init__(self, t, msg, ip=-1):
+		self.type = t
+		self.msg = msg
+		if not ip == -1:
+			self.ip = ip
+
 class HttpClient(Agent):
 	def __init__(self, name):
 		Agent.__init__(self, name)
 		print "Http Server criado ", name
 		self.type = "httpc"
+		self.cmdQueue = []
 
 	def isIp(self, dest):
 		dl = dest.split(".")
@@ -121,13 +143,19 @@ class HttpClient(Agent):
 
 	def Get(self, dest, ent):
 		if self.isIp(dest):
-			print "To mandando o get"
+			print "To mandando o get para", dest
 		else:
-			o = ent[self.owner]
-			hip = IPHeader(40, o.me, o.dns, 17)
-			udpp = Packet()
-			o.SendPackets(40, hip)
-			
+			o = self.owner
+			hip = IPHeader(o.me, o.dns, 17, 86400) # 6 se for TCP
+			hudp = UDPHeader(53, 53)
+			data = DNSMessage("Q", dest)
+			o.SendPackets(hip, hudp, data)
+			self.cmdQueue.append("get")
+			o.waitingAgents.append((dest, self))
+
+	def ResumeCmd(self, dnsMsg):
+		if len(self.cmdQueue) and self.cmdQueue[0] == "get":
+			print "To mandando o get para", dnsMsg.ip
 
 class HttpServer(Agent):
 	def __init__(self, name):
@@ -135,12 +163,23 @@ class HttpServer(Agent):
 		print "Http Client criado ", name
 		self.type = "https"
 
-
 class DNSServer(Agent):
 	def __init__(self, name):
 		Agent.__init__(self, name)
 		print "DNS Server criado ", name
 		self.type = "dnss"
+
+	def HandleMessage(self, p):		
+		name = p.data.msg
+		if name in DNSTABLE.keys() and p.data.type == "Q":
+			print "traduzindo", name, "para", DNSTABLE[name]
+			o = self.owner
+			hip = IPHeader(o.me, p.header.orig, 17, 86400) # 6 se for TCP
+			hudp = UDPHeader(53, 53)
+			data = DNSMessage("R", name, DNSTABLE[name])
+			o.SendPackets(hip, hudp, data)
+		elif p.data.type == "R":
+			print self.owner._name, "recebeu uma response de DNS"
 		
 class Link(object):
 	def __init__(self):
@@ -197,7 +236,7 @@ class Entity(object):
 
 	def AttachAgent(self, agName, ag):
 		self.agents[agName]  = ag
-		ag.SetOwner(self._name)
+		ag.SetOwner(self)
 
 	def GetRecLink(self, entities, sendLink):
 		self.dest = entities[sendLink.destinationName]
@@ -213,6 +252,7 @@ class Host(Entity):
 		Entity.__init__(self, name)
 		print "Host criado ", name
 		self.links = []
+		self.waitingAgents = []
 
 	def Loop(self, entities):
 		print "executando host ", self._name
@@ -246,19 +286,22 @@ class Host(Entity):
 		return self.links
 
 	def PrintLinks(self):
-		if not self.links.destinationPort == -1:
-			print self._name, "-->", str(self.links.destinationName)+"."+str(self.links.destinationPort), str(self.links.speed)+"ms", str(self.links.delay)+ "Mbps"
+		if not self.links[0].destinationPort == -1:
+			print self._name, "-->", str(self.links[0].destinationName)+"."+str(self.links[0].destinationPort), str(self.links[0].speed)+"ms", str(self.links[0].delay)+ "Mbps"
 		else:
-			print self._name, "-->", self.links.destinationName, str(self.links.speed)+"ms", str(self.links.delay), "Mbps"
+			print self._name, "-->", self.links[0].destinationName, str(self.links[0].speed)+"ms", str(self.links[0].delay), "Mbps"
 
-	def SendPackets(self, dataSize, header):
+	def SendPackets(self, hip, hudp, data):
 		# Checar se eh um ip ou um endereco
 		# if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",ip):
+		hudp.SetSize (sys.getsizeof(hudp) + sys.getsizeof(data))
+		dataSize = sys.getsizeof(hip) +  hudp.size
+		hip.SetSize (dataSize)
 		numPackets = dataSize / packetSize
 
 		numPackets += 1
 
-		print "SENDING PACKET from", self._name, "to", header.dest
+		print "SENDING PACKET from", self._name, "to", hip.dest
 		# now hosts have support for more then one link, 
 		# but they should not have more then one
 		for li in  self.links:
@@ -267,12 +310,21 @@ class Host(Entity):
 
 		for i in range(0, numPackets):
 			p = Packet()
-			p.SetHeader(header)
+			p.SetHeader(hip)
+			p.SetProtHeader(hudp)
+			p.SetData(data)
 			self.l.packets.append(p)
 
 	def ReceivePacket(self, packet, recLink):
 		if packet.header.dest == self.me:
-			print "Packet chegou no lugar certo"
+			if packet.header.prot == 17 and packet.protHeader.dest == 53:
+				for a in self.agents.keys():
+					if "dns" in a:
+						self.agents[a].HandleMessage(packet)
+				for a in self.waitingAgents:
+					if a[0] == packet.data.msg:
+						a[1].ResumeCmd(packet.data)
+
 		else:
 			print self._name, "transmitting packet"
 			self.links[0].packets.append(packet)
@@ -380,8 +432,7 @@ class Router(Entity):
 
 	#checks if x could be indentifyed by ip address a
 	def IsTheSame(self, x, a):
-
-		if x.GetType == Entity.host:
+		if x.GetType() == Entity.host:
 			if x.me == a:
 				return True
 		else:
@@ -393,10 +444,11 @@ class Router(Entity):
 
 	def ReceivePacket(self, packet, recLink):
 		del recLink.packets[0]
-		print self._name, "transmitting packet to", packet.header.dest		
+		print self._name, "trying to transmit packet to", packet.header.dest		
 		for k in self.routes.keys():
 			if self.SameSubNet(packet.header.dest, k):
 				if not self.isIp(self.routes[k]):
+					print self._name, "actually transmitting packet to", packet.header.dest		
 					self.links[int(self.routes[k])].packets.append(packet)
 				else:
 					for l in self.links:

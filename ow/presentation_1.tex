@@ -1,0 +1,246 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Beamer Presentation
+% LaTeX Template
+% Version 1.0 (10/11/12)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND THEMES
+%----------------------------------------------------------------------------------------
+
+\documentclass{beamer}
+\usepackage[brazil]{babel}
+\usepackage[latin1]{inputenc}
+
+\mode<presentation> {
+
+% The Beamer class comes with a number of default slide themes
+% which change the colors and layouts of slides. Below this is a list
+% of all the themes, uncomment each in turn to see what they look like.
+
+%\usetheme{default}
+%\usetheme{AnnArbor}
+%\usetheme{Antibes}
+%\usetheme{Bergen}
+%\usetheme{Berkeley}
+%\usetheme{Berlin}
+%\usetheme{Boadilla}
+%\usetheme{CambridgeUS}
+%\usetheme{Copenhagen}
+%\usetheme{Darmstadt}
+%\usetheme{Dresden}
+%\usetheme{Frankfurt}
+%\usetheme{Goettingen}
+%\usetheme{Hannover}
+%\usetheme{Ilmenau}0
+%\usetheme{JuanLesPins}
+\usetheme{Luebeck}
+%\usetheme{Madrid}
+%\usetheme{Malmoe}
+%\usetheme{Marburg}
+%\usetheme{Montpellier}
+%\usetheme{PaloAlto}
+%\usetheme{Pittsburgh}
+%\usetheme{Rochester}
+%\usetheme{Singapore}
+%\usetheme{Szeged}
+%\usetheme{Warsaw}
+
+% As well as themes, the Beamer class has a number of color themes
+% for any slide theme. Uncomment each of these in turn to see how it
+% changes the colors of your current slide theme.
+
+%\usecolortheme{albatross}
+%\usecolortheme{beaver}
+%\usecolortheme{beetle}
+%\usecolortheme{crane}
+%\usecolortheme{dolphin}
+%\usecolortheme{dove}
+%\usecolortheme{fly}
+%\usecolortheme{lily}
+%\usecolortheme{orchid}
+%\usecolortheme{rose}
+%\usecolortheme{seagull}
+%\usecolortheme{seahorse}
+%\usecolortheme{whale}
+%\usecolortheme{wolverine}
+
+%\setbeamertemplate{footline} % To remove the footer line in all slides uncomment this line
+%\setbeamertemplate{footline}[page number] % To replace the footer line in all slides with a simple slide count uncomment this line
+
+%\setbeamertemplate{navigation symbols}{} % To remove the navigation symbols from the bottom of all slides uncomment this line
+}
+
+\usepackage{graphicx} % Allows including images
+\usepackage{booktabs} % Allows the use of \toprule, \midrule and \bottomrule in tables
+\usepackage{url}
+\usepackage{tabularx}
+\usepackage{array} % for defining a new column type
+\usepackage{varwidth} %for the varwidth minipage environment
+\usepackage{amsfonts,amssymb,graphicx,enumerate}
+\usepackage{amsmath}
+
+%----------------------------------------------------------------------------------------
+%	TITLE PAGE
+%----------------------------------------------------------------------------------------
+
+\title[ep2 de MAC448]{Protocolos utilizados no ep2 de MAC448} % The short title appears at the bottom of every slide, the full title is only on the title page
+
+\author{André Pereira Mesquita \& Renato Scaroni}
+
+\bigskip
+\date{\today} % Date, can be changed to a custom date
+
+\begin{document}
+
+\begin{frame}
+\titlepage % Print the title page as the first slide
+\end{frame}
+
+\begin{frame}
+%\frametitle{Sumário} % Table of contents slide, comment this block out to remove it
+\tableofcontents % Throughout your presentation, if you choose to use \section{} and \subsection{} commands, these will automatically be printed on this slide as an overview of your presentation
+\end{frame}
+
+%----------------------------------------------------------------------------------------
+%	PRESENTATION SLIDES
+%----------------------------------------------------------------------------------------
+
+%------------------------------------------------
+\section{Protocolo de conexão entre os usuários e o servidor} % Sections can be created in order to organize your presentation into discrete blocks, all sections and subsections are automatically printed in the table of contents as an overview of the talk
+%------------------------------------------------
+
+\begin{frame}
+%\frametitle{Protocolo de conexão entre os usuários e o servidor}
+\begin{block}{Criando conexão}
+ O cliente inicia enviando para o servidor qual o tipo de conexão vai fazer (tcp ou udp), junto com o
+ nome do usuario e a porta a ser usada para conexão p2p. O servidor lança então uma thread separada para tratar
+ as mensagens enviadas pelo usuário. Do lado do cliente, são criadas duas threads, uma que escuta inputs de usuário e os
+ envia para o servidor e outra que escuta mensagens vindas do servidor.
+\end{block}
+
+\end{frame}
+
+%------------------------------------------------
+
+
+\begin{frame}
+%\frametitle{Protocolo de conexão entre os usuários e o servidor}
+
+\begin{block}{Tratando as mensagens}
+Após a conexão ser estabelecida, o tratamento das mensagens é feito da seguinte forma:
+ \begin{itemize}
+  \item O servidor recebe a mensagem do cliente e manda a mesma para um método parser no próprio servidor que vai cuidar de escolher que mensagem deve ser enviada de
+  volta para o cliente. O próprio parser utiliza o socket guardado na lista de conexões para enviar a mensagem.
+  \item O cliente recebe a mensagem de resposta do servidor e decide entre mostrar na tela para o usuário a mensagem ou tomar alguma ação interna. A decisão do cliente
+  ao receber a mensagem vai depender se a mensagem começa com uma de três palavras reservadas: ?Alive?, \begin{math}<\end{math}connect\begin{math}>\end{math} ou \begin{math}<\end{math}release\begin{math}>\end{math}
+  \end{itemize}
+  
+\end{block}
+
+\end{frame}
+%------------------------------------------------
+
+%------------------------------------------------
+\section{Protocolo de conexão entre os usuários} % Sections can be created in order to organize your presentation into discrete blocks, all sections and subsections are automatically printed in the table of contents as an overview of the talk
+%------------------------------------------------
+
+\subsection[Abrindo a conexão]{Abrindo a conexão}
+
+\begin{frame}
+%\frametitle{Protocolo de conexão entre os usuários}
+\begin{block}{Comunicando o servidor}
+  Quando um programa cliente capta da entrada padrão que deve se conectar com um outro cliente ele envia uma mensagem ao servidor através da thread que escuta a entrada do usuário,
+  dizendo que quer se conectar com o usuário passado como parametro ao comando connect, bem como a porta a que o mesmo deve responder ao pedido de conexão. Em seguida cria uma thread 
+  para esperar a conexão do usuário desejado e marca a thread que recebe inputs de usuário para não mais aceitá-los. O servidor vai associar a cada cliente uma string com o nome
+  do cliente ao qual ele está conectado, sinalizando que eles já estão em conexão com algum cliente. Importante notar que a thread que rece mensagem do servidor ainda estará ativa
+  para responder ao heartbeat que o servidor enviará a cara 65 segundos, caso não receba nada do cliente.
+\end{block}
+
+\end{frame}
+
+%------------------------------------------------
+
+
+\begin{frame}
+%\frametitle{Protocolo de conexão entre os usuários}
+
+\begin{block}{Resposta do servidor}
+Ao receber a mensagem iniciada com a palavra connect de um cliente, o servidor também vai receber o nome do usuário que vai receber a conexão, bem como a porta em que o mesmo deve se 
+conectar no cliente que pediu a conexão. Em seguida o servidor monta uma mensagem contendo o nome do usuário que solicitou a conexão, seu endereço na rede e a porta em que estará 
+escutando a resposta, bem como uma palavra reservada pedindo para o cliente que deve receber o pedido de conexão se conectar com o primeiro.
+\end{block}
+
+\end{frame}
+%------------------------------------------------
+
+\begin{frame}
+%\frametitle{Protocolo de conexão entre os usuários}
+
+\begin{block}{Iniciando conexão}
+O cliente que receberá o pedido de conexão, receberá a mensagem montada pelo servidor, descrita no item anterior, e criará dois sockets, um para receber e outro para enviar as
+mensagens. Esses sockets se conectarão com o outro cliente na porta que ele sinalizou no servidor e marca a quem está conectado, guardando o nome do usário do cliente que pediu a 
+conexão. Por fim, lança duas threads: uma escuta entrada de usuário e envia as mensagens para outro cliente e a outra para esperar mensagens do outro cliente.
+\end{block}
+
+\end{frame}
+
+%------------------------------------------------
+
+%------------------------------------------------
+
+\begin{frame}
+%\frametitle{Protocolo de conexão entre os usuários}
+
+\begin{block}{Fim do protocolo de conexão}
+O cliente que enviou ao servidor o pedido de conexão estará escutando pelos dois sockets criados pelo outro cliente. assim que receber ambos salva a referencia de cada de forma que
+possa enviar e receber mensagem. Após receber os sockets, são lançadas mais duas threads:uma escuta entrada de usuário e envia as mensagens para outro cliente e a outra para esperar 
+mensagens do outro cliente.
+\end{block}
+
+\end{frame}
+
+%------------------------------------------------
+\subsection[Encerrando conexão]{Encerrando conexão}
+
+\begin{frame}
+%\frametitle{Protocolo de conexão entre os usuários}
+
+\begin{block}{iniciando o protocolo de ecerramento de conexão}
+O cliente que deseja encerrar a conexão recebe o input do usuário (consistindo apenas do comando \begin{math}<\end{math}close\begin{math}>\end{math}. Captando isso, a thread 
+que envia mensagem para outro cliente fecha o socket, envia a mensagempara o outro cliente dizendo que quer terminar a conexão, envia uma mensagem para o servidor
+dizendo que quer terminar a conversa, fecha o socket e encerra a thread. O cliente do outro lado recebe a mensagem, encerra a thread e fecha o socket também.
+\end{block}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}
+%\frametitle{Protocolo de conexão entre os usuários}
+
+\begin{block}{Servidor}
+O servidor recebe a mensagem e envia para ambos os clientes uma mensagem para que a thread que escuta input de usuário e envia mensagens ao servidor seja liberada.
+Os clientes recebem essa mensagem e liberam essas threads, permitindo que possam acessar o servidor novamente.
+\end{block}
+
+\end{frame}
+
+%------------------------------------------------
+%------------------------------------------------
+\section{}
+%------------------------------------------------
+
+\begin{frame}
+\Huge{\centerline{The End}}
+\end{frame}
+
+%----------------------------------------------------------------------------------------
+
+\end{document} 

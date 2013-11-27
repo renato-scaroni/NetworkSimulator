@@ -2,16 +2,10 @@ from operator import itemgetter
 import sys
 
 simulatorSingleton = None
-packetSize = 1024 * 8 * 500 #500 kbytes
+packetSize = 4096 #100 kbytes
 UDPID = 0
-PACKID = 0
+TCPID = 0
 DNSTABLE = {}
-DEBUG = False
-CLOCK = 0
-TIMESTEP =  0.000001
-def debugPrint(s1, s2="", s3="", s4="", s5=""):
-	if DEBUG:
-		print s1, s2, s3, s4
 
 class EP3Simulator(object):
 	def __init__(self, entities, agents):
@@ -19,13 +13,14 @@ class EP3Simulator(object):
 		self.entities = entities
 		self.agents = agents
 		self.commands = []
+		self.clock = 0
 		simulatorSingleton = self
 
 	def SetCommands(self, c): # a command is a tuple (time, commandString)
 		self.commands = c
 
 	def ParseAndExecuteCommand(self, cmd):
-		debugPrint ("Comando: " + cmd)
+		print "Comando: " + cmd
 		splittedCmd = cmd.replace("\"", "").replace("'", "").split(" ") #WTF???
 
 		if cmd == "\"finish\"":
@@ -35,37 +30,26 @@ class EP3Simulator(object):
 		if agent.type == "httpc" and splittedCmd[1] == "GET":
 			agent.Get(splittedCmd[2], self.entities)
 
-
 		return True
 
 	def Simulate(self, outputFile):
 		if len(self.commands) > 0:
 			self.commands = sorted(self.commands, key=itemgetter(0))
-			debugPrint ("commands to execute :")
+			print "commands to execute :"
 			for c in self.commands:
-				debugPrint (c)
+				print c
 			self.time = float(self.commands[0][0])
 		else:
-			debugPrint ("Nao existem comandos a serem executados")
+			print "Nao existem comandos a serem executados"
 			return
 
 		for k in self.entities.keys():
 			self.entities[k].PrintLinks()
-		global CLOCK
-		CLOCK = 0
-		global PACKID
-		PACKID = 0
-
-		opf = open(outputFile, "w+")
-
-		for k in self.agents.keys():
-			if self.agents[k].type == "sniffer":
-				self.agents[k].SetOutputFile(opf)
 
 		keepSimulating = True
 		while keepSimulating or len(self.commands) > 0:
 			for c in self.commands:
-				if float(c[0]) < float(CLOCK):
+				if float(c[0]) < float(self.clock):
 					if not self.ParseAndExecuteCommand(c[1]): self.commands = []
 					else: self.commands = [s for s in self.commands if s != c]
 
@@ -73,16 +57,12 @@ class EP3Simulator(object):
 			for k in self.entities.keys():
 				keepSimulating = self.entities[k].Loop(self.entities) or keepSimulating
 				# self.entities[k].PrintLinks()
-			CLOCK += TIMESTEP
+			self.clock += 0.001
 
 class Packet(object):
 	def __init__(self):
 		self.data = None
 		self.header = None
-		self.proc = 0
-		global PACKID
-		self.id = PACKID
-		PACKID += 1
 
 	def SetHeader(self, h):
 		self.header = h
@@ -93,15 +73,28 @@ class Packet(object):
 	def SetData(self, data):
 		self.data = data
 
-	def ProcessPacket(self):
-		self.proc += TIMESTEP*100000
-
 class Header(object):
 	def __init__(self):
 		super(Header, self).__init__()
 
 	def SetSize(self, s):
 		self.size = s #int
+
+class TCPHeader(Header):
+	# orig e dest are the port used by the service
+	def __init__(self, orig, dest, seq, rec, ACK, FIN, SYN):
+		super(TCPHeader, self).__init__()
+		self.dest = dest #string
+		self.orig = orig #string
+		self.seq = seq
+		self.rec = rec
+		self.ACK = ACK
+		self.FIN = FIN
+		self.SYN = SYN
+		global TCPID
+		self.id = TCPID
+		TCPID += 1
+		
 
 class UDPHeader(Header):
 	# orig e dest are the port used by the service
@@ -128,72 +121,34 @@ class Agent(object):
 		pass	
 
 	def SetOwner(self, o):
-		debugPrint (self._name, "associado a", o._name)
+		print self._name, "associado a", o._name
 		self.owner = o
 
 class Sniffer(Agent):
 	def __init__(self, name):
 		Agent.__init__(self, name)
-		debugPrint ("sniffer criado ", name)
-		self._name = name
+		print "sniffer criado ", name
 		self.type = "sniffer"
-		self.logFile = None
-
-	def SetOutputFile(self, opf):
-		self.opf = opf
 
 	def SetLogFile(self, path):
-		debugPrint (self._name, "log salvo em", path)
+		print name, "log salvo em", path
 		self.logPath = path
 
-		self.logFile = open(self.logPath, 'w+')
-
-	def Log(self, p):
-		debugPrint ("to fazenu logui")
-
-		if self.logFile == None:
-			debugPrint("criano logui")
-
-		toPrint =  "Pacote: " + str(p.id) + "\n"
-		toPrint +=  "Tempo: " + str(CLOCK) + "\n"
-		toPrint += "Sniffer: " + self._name + "\n"
-		toPrint += "\n"
-		toPrint += "IP: " + "\n"
-		toPrint += "Endereco de origem: " + p.header.orig + "\n"
-		toPrint += "Endereco de destino: " + p.header.dest + "\n"
-		toPrint += "Protocolo da camada acima: " + str(p.header.prot) + "\n"
-		toPrint += "Tamanho na camada superior: " + str(p.header.size) + "\n"
-		toPrint += "TTL: " + str(p.header.ttl) + "\n"
-		toPrint += "\n"
-		if p.header.prot == 17:
-			toPrint += "UDP: " + "\n"
-			toPrint += "Porta de origem: " + str(p.protHeader.orig) + "\n"
-			toPrint += "Porta de destino: " + str(p.protHeader.dest) + "\n"
-			toPrint += "Tamanho na camada superior: " + str(p.protHeader.size) + "\n"
-		elif p.header.prot == 6: # ou que budegas for a porta do tcp
-			toPrint += "tranqueiras do tcp"
-		toPrint += "\n"
-		if p.data.ip == -1:	
-			toPrint += "Mensagem DNS: resolvendo nome para " + p.data.msg + "\n"
-		else:
-			toPrint += "Mensagem DNS: "+ p.data.msg + "=" + p.data.ip + "\n"
-		toPrint += "-------------------------------------------------------------\n"
-
-		self.logFile.write(toPrint)
-		print toPrint
-
-class DNSMessage:
+class Message:
 	def __init__(self, t, msg, ip=-1):
 		self.type = t
 		self.msg = msg
-		self.ip = ip
+		if not ip == -1:
+			self.ip = ip
 
 class HttpClient(Agent):
 	def __init__(self, name):
 		Agent.__init__(self, name)
-		debugPrint ("Http Server criado ", name)
+		print "Http Server criado ", name
 		self.type = "httpc"
 		self.cmdQueue = []
+		self.active = False
+		self.server = None
 
 	def isIp(self, dest):
 		dl = dest.split(".")
@@ -205,44 +160,112 @@ class HttpClient(Agent):
 		return False
 
 	def Get(self, dest, ent):
+		if self.active:
+			print "Ainda Processando uma requisicao"
+			return
+
 		if self.isIp(dest):
-			debugPrint ("To mandando o get para", dest)
-		else:
+			print "To mandando de verdade o get para", dest
+			o = self.owner
+			hip = IPHeader(o.me, dest, 6, 86400) # 6 se for TCP
+			htcp = TCPHeader(o.me, 53, 0, 999, False, False, True) #sends a SYN packet
+			data = Message("t", "Nothing for now")
+			o.SendPackets(hip, htcp, data)
+			print "Send SYN"
+		else: #find out the ip
 			o = self.owner
 			hip = IPHeader(o.me, o.dns, 17, 86400) # 6 se for TCP
 			hudp = UDPHeader(53, 53)
-			data = DNSMessage("Q", dest)
+			data = Message("Q", dest)
 			o.SendPackets(hip, hudp, data)
 			self.cmdQueue.append("get")
 			o.waitingAgents.append((dest, self))
 
+	def Receive(self, packet):
+		if packet.protHeader.SYN and packet.protHeader.ACK and not self.active: #connection request
+			o = self.owner
+			hip = IPHeader(o.me, packet.header.orig, 6, 86400) # 6 se for TCP
+			htcp = TCPHeader(o.me, 53, 0, 999, True, False, False) #sends a ACK packet
+			data = Message("t", "Nothing for now")
+			o.SendPackets(hip, htcp, data)
+			print "Send ACK"
+			self.active = True
+		elif packet.protHeader.FIN and self.active: #connection request
+			o = self.owner
+			hip = IPHeader(o.me, packet.header.orig, 6, 86400) # 6 se for TCP
+			htcp = TCPHeader(o.me, 53, 0, 999, True, False, False) #sends a ACK packet
+			data = Message("t", "Nothing for now")
+			o.SendPackets(hip, htcp, data)
+
+			htcp = TCPHeader(o.me, 53, 0, 999, False, True, False) #sends a FIN packet
+			o.SendPackets(hip, htcp, data)
+			print "Client sending FIN"
+			self.active = False
+		elif self.active:
+			print "Receive packet with contents: ", str(len(packet.data.msg))
+
 	def ResumeCmd(self, dnsMsg):
 		if len(self.cmdQueue) and self.cmdQueue[0] == "get":
-			debugPrint ("To mandando o get para", dnsMsg.ip)
+			print "To mandando o get para", dnsMsg.ip
+			self.Get(dnsMsg.ip, None) 
 
 class HttpServer(Agent):
 	def __init__(self, name):
 		Agent.__init__(self, name)
-		debugPrint ("Http Client criado ", name)
+		print "Http Client criado ", name
 		self.type = "https"
+		self.clients = {}
+
+	def Receive(self, packet):
+		if packet.protHeader.SYN: #connection request
+			o = self.owner
+			hip = IPHeader(o.me, packet.header.orig, 6, 86400) # 6 se for TCP
+			htcp = TCPHeader(o.me, 53, 0, 999, True, False, True) #sends a SYN + ACK packet
+			data = Message("t", "Nothing for now")
+			o.SendPackets(hip, htcp, data)
+			self.clients[packet.header.orig] = False
+			print "Send SYN+ACK"
+		elif packet.protHeader.ACK and not self.clients[packet.header.orig]: #connection request
+			print "Received ACK"
+			self.clients[packet.header.orig] = True
+			index = open("index.html", "r")
+			indexData = index.read()
+			index.close()
+			size = sys.getsizeof(indexData)
+			chunks = size / packetSize + 1
+			o = self.owner
+			hip = IPHeader(o.me, packet.header.orig, 6, 86400) # 6 se for TCP
+			htcp = TCPHeader(o.me, 53, 0, 999, True, False, True) #sends a SYN + ACK packet
+			print "Number of chunks", chunks
+			for i in range(chunks):
+				data = Message("t", indexData[i*packetSize:min(((i+1)*packetSize), size)]) #
+				o.SendPackets(hip, htcp, data)
+				print "Send Normal Packet"
+			htcp = TCPHeader(o.me, 53, 0, 999, False, True, False) #sends a FIN packet
+			data = Message("t", "Nothing for now")
+			o.SendPackets(hip, htcp, data)
+			print "Server sending FIN"
+		elif packet.protHeader.ACK and self.clients[packet.header.orig]: #disconnection request
+			del self.clients[packet.header.orig]
+
 
 class DNSServer(Agent):
 	def __init__(self, name):
 		Agent.__init__(self, name)
-		debugPrint ("DNS Server criado ", name)
+		print "DNS Server criado ", name
 		self.type = "dnss"
 
 	def HandleMessage(self, p):		
 		name = p.data.msg
 		if name in DNSTABLE.keys() and p.data.type == "Q":
-			debugPrint ("traduzindo", name, "para", DNSTABLE[name])
+			print "traduzindo", name, "para", DNSTABLE[name]
 			o = self.owner
 			hip = IPHeader(o.me, p.header.orig, 17, 86400) # 6 se for TCP
 			hudp = UDPHeader(53, 53)
-			data = DNSMessage("R", name, DNSTABLE[name])
+			data = Message("R", name, DNSTABLE[name])
 			o.SendPackets(hip, hudp, data)
 		elif p.data.type == "R":
-			debugPrint (self.owner._name, "recebeu uma response de DNS")
+			print self.owner._name, "recebeu uma response de DNS"
 		
 class Link(object):
 	def __init__(self):
@@ -255,9 +278,9 @@ class Link(object):
 
 	def SetSniffer(self, s):
 		if self.destinationPort == -1:
-			debugPrint ("sniffer no link para", self.destinationName)
+			print "sniffer no link para", self.destinationName
 		else:
-			debugPrint ("sniffer no link para", str(self.destinationName)+ "." +str(self.destinationPort))
+			print "sniffer no link para", str(self.destinationName)+ "." +str(self.destinationPort)
 		self.sniffer = s
 
 	def SetSpeed(self, s):
@@ -275,10 +298,6 @@ class Link(object):
 		targetEntity = simulatorSingleton.entities[self.destinationName]
 		for p in self.packets:
 			targetEntity.ReceivePacket(p)
-
-	def RunSniffer(self, p):
-		if self.sniffer:
-			self.sniffer.Log(p)
 
 # May also be refered to as a device. Its an abstraction
 # for both Host and Router
@@ -317,19 +336,25 @@ class Host(Entity):
 		if(name == ""):
 			return
 		Entity.__init__(self, name)
-		debugPrint ("Host criado ", name)
+		print "Host criado ", name
 		self.links = []
 		self.waitingAgents = []
+		self.buffer = []
 
 	def Loop(self, entities):
-		debugPrint ("executando host ", self._name)
+		print "executando host ", self._name
 		self.cont = False
-		self.cont  = self.cont or len(self.links[0].packets) > 0
+		self.cont  = self.cont or len(self.links[0].packets) > 0 or len(self.buffer) > 0
 
 		self.recLink = self.GetRecLink(entities, self.links[0])
 
 		if len(self.recLink.packets) > 0:
 			self.ReceivePacket(self.recLink.packets[0], self.recLink)
+
+		for p in self.buffer:
+			self.l.packets.append(p)
+			self.buffer = filter(lambda x: x != p, self.buffer)
+
 
 		return self.cont
 
@@ -344,31 +369,29 @@ class Host(Entity):
 		self.me = host
 		self.router = router
 		self.dns = dns[:-1]
-		debugPrint ("\n", self._name, ":")
-		debugPrint ("ip", self.me)
-		debugPrint ("router", router)
-		debugPrint ("DNS:", dns[:-1], "\n")
+		print "\n", self._name, ":"
+		print "ip", self.me
+		print "router", router
+		print "DNS:", dns[:-1], "\n"
 
 	def GetLink(self):
 		return self.links
 
 	def PrintLinks(self):
 		if not self.links[0].destinationPort == -1:
-			debugPrint (self._name, "-->", str(self.links[0].destinationName)+"."+str(self.links[0].destinationPort), str(self.links[0].speed)+"ms", str(self.links[0].delay)+ "Mbps")
+			print self._name, "-->", str(self.links[0].destinationName)+"."+str(self.links[0].destinationPort), str(self.links[0].speed)+"ms", str(self.links[0].delay)+ "Mbps"
 		else:
-			debugPrint (self._name, "-->", self.links[0].destinationName, str(self.links[0].speed)+"ms", str(self.links[0].delay), "Mbps")
+			print self._name, "-->", self.links[0].destinationName, str(self.links[0].speed)+"ms", str(self.links[0].delay), "Mbps"
 
-	def SendPackets(self, hip, hudp, data):
-		# Checar se eh um ip ou um endereco
-		# if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",ip):
-		hudp.SetSize (sys.getsizeof(hudp) + sys.getsizeof(data))
-		dataSize = sys.getsizeof(hip) +  hudp.size
+	def SendPackets(self, hip, hp, data):
+		hp.SetSize (sys.getsizeof(hp) + sys.getsizeof(data))
+		dataSize = sys.getsizeof(hip) +  hp.size
 		hip.SetSize (dataSize)
 		numPackets = dataSize / packetSize
 
 		numPackets += 1
 
-		debugPrint ("SENDING PACKET from", self._name, "to", hip.dest)
+		print "SENDING PACKET from", self._name, "to", hip.dest
 		# now hosts have support for more then one link, 
 		# but they should not have more then one
 		for li in  self.links:
@@ -378,14 +401,14 @@ class Host(Entity):
 		for i in range(0, numPackets):
 			p = Packet()
 			p.SetHeader(hip)
-			p.SetProtHeader(hudp)
+			p.SetProtHeader(hp)
 			p.SetData(data)
-			self.l.packets.append(p)
-			self.l.RunSniffer(p)
+			#self.l.packets.append(p)
+			self.buffer.append(p)
 
 	def ReceivePacket(self, packet, recLink):
 		if packet.header.dest == self.me:
-			if packet.header.prot == 17 and packet.protHeader.dest == 53:
+			if packet.header.prot == 17 and packet.protHeader.dest == 53: #udp
 				for a in self.agents.keys():
 					if "dns" in a:
 						self.agents[a].HandleMessage(packet)
@@ -393,10 +416,18 @@ class Host(Entity):
 					if a[0] == packet.data.msg:
 						a[1].ResumeCmd(packet.data)
 
+			elif packet.header.prot == 6 and packet.protHeader.dest == 53: #tcp
+				for a in self.agents.keys():
+					if "httpc" in a or "https" in a:
+						self.agents[a].Receive(packet)
+				for a in self.waitingAgents:
+					if a[0] == packet.data.msg:
+						a[1].ResumeCmd(packet.data)
+
+
 		else:
-			debugPrint (self._name, "transmitting packet")
+			print self._name, "transmitting packet"
 			self.links[0].packets.append(packet)
-			self.links[0].RunSniffer(packet)
 		del recLink.packets[0]
 
 class Router(Entity):
@@ -418,13 +449,13 @@ class Router(Entity):
 			self.links.append(Link())
 			self.maxPacketQueue.append(0)
 		
-		debugPrint ("Router criado ", name)
+		print "Router criado ", name
 		
 		self._name = name
 
 		#this list will keep tuples with the ports and ips 
 		#that will indentify this router
-		self.ips = []
+		self.ips = [] 
 
 		#this dict will keep the routes table
 		self.routes = {}
@@ -433,12 +464,12 @@ class Router(Entity):
 		self.procTime = 0
 
 	def SetRoutes(self, orig, dest):
-		debugPrint ("adding route", orig, dest)
+		print "adding route", orig, dest
 		self.routes[orig] = dest
 
 	def SetLink(self, d, s, dest, destp, port, destEnt):
 		if port > self.interfacesCount:
-			debugPrint ("porta inexistente")
+			print "porta inexistente"
 			return
  
 		self.links[port].SetSpeed(s)
@@ -447,17 +478,17 @@ class Router(Entity):
 
 	def SetIps(self, ip, port):
 		self.ips.append((ip, port))
-		debugPrint ("orig", ip)
-		debugPrint ("dest", port, "\n")
+		print "orig", ip
+		print "dest", port, "\n"
 
 	def SetProcTime(self, p):
-		debugPrint ("Tempo de processamento de pacotes", p)
+		print "Tempo de processamento de pacotes", p
 		self.procTime = p
 
 	def SetMaxQueueForPort(self, port, l):		
 		self.maxPacketQueue[port] = l
-		debugPrint ("porta", port)
-		debugPrint ("limite", l, "\n")
+		print "porta", port
+		print "limite", l, "\n"
 
 	def GetLink(self, port):
 		return self.links[int(port)]
@@ -466,20 +497,17 @@ class Router(Entity):
 		for i in range(self.interfacesCount):
 			l = self.links[i]
 			if not l.destinationPort == -1:
-				debugPrint (self._name+"."+str(i), "-->", str(l.destinationName) + "."+ str(l.destinationPort), str(l.speed)+"ms", str(l.delay)+ "Mbps")
+				print self._name+"."+str(i), "-->", str(l.destinationName) + "."+ str(l.destinationPort), str(l.speed)+"ms", str(l.delay)+ "Mbps"
 			else:
-				debugPrint (self._name+"."+str(i), "-->", l.destinationName, str(l.speed)+"ms", str(l.delay)+ "Mbps")
+				print self._name+"."+str(i), "-->", l.destinationName, str(l.speed)+"ms", str(l.delay)+ "Mbps"
 
 	def Loop(self, entities):
-		debugPrint ("executando router ", self._name)
+		print "executando router ", self._name
 		self.ret = False
 		for l in self.links:
 			self.recLink = self.GetRecLink(entities, l)
 			if len(self.recLink.packets) > 0:
-				if self.recLink.packets[0].proc < int(self.procTime):
-					self.recLink.packets[0].ProcessPacket()
-				else:
-					self.ReceivePacket(self.recLink.packets[0], self.recLink)
+				self.ReceivePacket(self.recLink.packets[0], self.recLink)
 				self.ret = True
 		return self.ret
 
@@ -516,15 +544,13 @@ class Router(Entity):
 
 	def ReceivePacket(self, packet, recLink):
 		del recLink.packets[0]
-		debugPrint (self._name, "trying to transmit packet to", packet.header.dest		)
+		print self._name, "trying to transmit packet to", packet.header.dest		
 		for k in self.routes.keys():
 			if self.SameSubNet(packet.header.dest, k):
 				if not self.isIp(self.routes[k]):
-					debugPrint (self._name, "actually transmitting packet to", packet.header.dest		)
+					print self._name, "actually transmitting packet to", packet.header.dest		
 					self.links[int(self.routes[k])].packets.append(packet)
-					self.links[int(self.routes[k])].RunSniffer(packet)
 				else:
 					for l in self.links:
 						if self.IsTheSame(l.destination, self.routes[k]):
 							l.packets.append(packet)
-							l.RunSniffer(packet)

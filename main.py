@@ -40,19 +40,17 @@ def CreateLink(data, entities):
 
 	if entities[origDevice].GetType() == Entity.host:
 		entities[origDevice].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), destDevice[0], int(destPort), entities[destDevice[0]])
-		print "CREATING LINK ", origDevice, destDevice[0]
+		debugPrint("CREATING LINK ", origDevice, destDevice[0])
 	else:
 		entities[origDevice].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), destDevice[0], int(destPort), int(origPort), entities[destDevice[0]])
-		print "CREATING LINK ", origDevice, destDevice[0]
-
-
+		debugPrint("CREATING LINK ", origDevice, destDevice[0])
 
 	if entities[destDevice[0]].GetType() == Entity.host:
 		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), entities[origDevice])
-		print "CREATING LINK ", destDevice[0], origDevice
+		debugPrint("CREATING LINK ", destDevice[0], origDevice)
 	else:
 		entities[destDevice[0]].SetLink(GetNumFromString(data[4]), GetNumFromString(data[5]), (origDevice), int(origPort), int(destPort), entities[origDevice])
-		print "CREATING LINK ", destDevice[0], origDevice
+		debugPrint("CREATING LINK ", destDevice[0], origDevice)
 
 def CutLineEnding (s):
 	if s[-1] == '\n':
@@ -65,24 +63,27 @@ def ConfigureHost(h, data):
 
 def ConfigureRouterRoutes(r, data):
 	i = 3
-	print "config de rota para", data[1][1:]
+	debugPrint("config de rota para", data[1][1:])
 	while i < len(data) - 1: 
 		r.SetRoutes(data[i], CutLineEnding(data[i+1]))
 		i = i + 2
 
 def ConfigureRouterIps(r, data):
 	i = 2
-	print "\n", data[1][1:], ":"
+	debugPrint("\n", data[1][1:], ":")
 	while i < len(data) - 1: 
 		r.SetIps(CutLineEnding(data[i+1]), data[i])
 		i = i + 2
 
 def ConfigureRouterPerformance(r, data):
-	print "config de perforance para", data[1][1:]
+	debugPrint("config de perforance para", data[1][1:])
 	r.SetProcTime(data[3][:-2])
 	i = 4
+	global CLOCK
 	while i < len(data) - 1: 
 		r.SetMaxQueueForPort(int(data[i]), CutLineEnding(data[i+1]))
+		if CLOCK < float(data[i])/100000:
+			CLOCK = int(data[i])
 		i = i + 2
 
 def AttachAgent(agName, ent, agents):
@@ -108,7 +109,9 @@ def AttachSniffer(ag, ent, data):
 	else:
 		l2 = ent[d2[0]].GetLink()
 		for l in l2:
-			l.SetSniffer(ag[data[2][1:]])	
+			l.SetSniffer(ag[data[2][1:]])
+
+	ag[data[2][1:]].SetLogFile(data[5][1:-2])	
 
 	
 
@@ -162,7 +165,7 @@ def readInput(inputFilename, outputFilename):
 
 def main():
 	if len(sys.argv) < 3 or len(sys.argv) > 3:
-		print "Uso: ./main.py <entrada> <saida>"
+		debugPrint("Uso: ./main.py <entrada> <saida>")
 		return
 	readInput(sys.argv[1], sys.argv[2])
 

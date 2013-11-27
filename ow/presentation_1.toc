@@ -1,6 +1,0 @@
-\beamer@endinputifotherversion {3.10pt}
-\select@language {brazil}
-\beamer@sectionintoc {1}{Protocolo de conex\~ao entre os usu\'arios e o servidor}{3}{0}{1}
-\beamer@sectionintoc {2}{Protocolo de conex\~ao entre os usu\'arios}{5}{0}{2}
-\beamer@subsectionintoc {2}{1}{Abrindo a conex\~ao}{5}{0}{2}
-\beamer@subsectionintoc {2}{2}{Encerrando conex\~ao}{9}{0}{2}

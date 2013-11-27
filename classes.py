@@ -114,6 +114,16 @@ class IPHeader(Header):
 		self.prot = prot #int
 		self.ttl = ttl
 
+
+
+
+
+
+
+
+
+
+
 class Agent(object):
 	def __init__(self, name):
 		self.owner = None
